@@ -27,7 +27,7 @@ def run_health_check_server():
     httpd.serve_forever()
 
 # Bot sozlamalari
-TOKEN = "8812256632:AAGPMq6Fb8yixbV-ThbVW13GwiqbXN8Xyg"
+TOKEN = "8812256632:AAHfNhZT_-tNGv16HzhGCvrodYIHTVJhrmM"
 
 # 20 talik test savollari
 QUESTIONS = [
