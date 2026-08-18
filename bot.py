@@ -77,7 +77,7 @@ QUESTIONS = [
     {"question": "Suvning kimyoviy formulasi qanday?", "options": ["H2O", "CO2", "NaCl"], "correct": 0},
     {"question": "Alisher Navoiy qaysi yilda tavallud topgan?", "options": ["1441-yil", "1500-yil", "1336-yil"], "correct": 0},
     {"question": "Yaponiya poytaxti qaysi shahar?", "options": ["Pekin", "Tokio", "Seul"], "correct": 1},
-    {"question": "O'zbekiston Respublikasining davlat bayrog'i qachon qabul qilingan?", "options": ["1991-yil 1-sentyabr", "1992-yil 18-noyabr", "1993-yil 8-dekabr"], "correct": 1},
+    {"question": "O'zbekiston Respublikasining davlat bayrog'i qachon qabul qilingan?", "options": ["1991-yil 1-sentyabr", "1991-yil 18-noyabr", "1993-yil 8-dekabr"], "correct": 2},
     {"question": "Dunyodagi eng kichik davlat qaysi?", "options": ["Monako", "Vatikan", "San-Marino"], "correct": 1},
     {"question": "Qaysi qit'a 'Qora qit'a' deb ataladi?", "options": ["Osiyo", "Afrika", "Janubiy Amerika"], "correct": 1},
     {"question": "Amir Temur qachon tavallud topgan?", "options": ["1336-yil", "1405-yil", "1226-yil"], "correct": 0},
