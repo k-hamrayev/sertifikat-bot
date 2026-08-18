@@ -19,7 +19,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 # SOZLAMALAR
 # ==========================================
 ADMIN_ID = 5070261597
-TOKEN = "8812256632:AAEp7G5xem6lWdImrkdewpn9FCmm9kt8T3O"
+TOKEN = "8812256632:AAEp7G5xem6lWdIMrkdewpN9FCmm9kt8T30"
 
 # Database - Ma'lumotlar bazasini yaratish
 def init_db():
