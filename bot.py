@@ -101,6 +101,7 @@ def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: s
         rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0
     )
     
+    # QR kod yaratish
     qr_data = f"Sertifikat №: {cert_num}\nIsm: {user_name}\nNatija: {score}/{total}\nSana: {datetime.date.today().strftime('%d.%m.%Y')}"
     qr_img = qrcode.make(qr_data)
     qr_buffer = io.BytesIO()
@@ -108,24 +109,21 @@ def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: s
     qr_buffer.seek(0)
     
     styles = getSampleStyleSheet()
+    
+    # Ism uchun maxsus shrift va tekislash (Chiziq ustiga to'g'ri tushishi uchun)
     name_style = ParagraphStyle(
         'CertName',
         parent=styles['Normal'],
         fontName='Times-BoldItalic',
-        fontSize=36,
-        textColor=colors.HexColor('#1A1A1A'),
+        fontSize=34,
+        textColor=colors.HexColor('#2A1A08'),
         alignment=1
     )
 
     elements = [
-        Spacer(1, 260),
-        Paragraph(f"{user_name}", name_style),
-        Spacer(1, 100)
+        Spacer(1, 282), # Ismni aynan chiziq ustidagi ochiq joyga tushirish uchun aniq oraliq
+        Paragraph(f"{user_name}", name_style)
     ]
-    
-    qr_image = Image(qr_buffer, width=55, height=55)
-    qr_image.hAlign = 'CENTER'
-    elements.append(qr_image)
 
     def draw_background(canvas, doc):
         canvas.saveState()
@@ -133,8 +131,13 @@ def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: s
         if os.path.exists(template_path):
             canvas.drawImage(template_path, 0, 0, width=landscape(A4)[0], height=landscape(A4)[1])
         
+        # QR-kodni pastki chap tomondagi toza va mos bo'shliqqa chiroyli joylashtirish
+        qr_image_obj = Image(qr_buffer, width=50, height=50)
+        qr_image_obj.drawOn(canvas, 130, 85)
+        
+        # Sertifikat raqami va sanasini pastki burchakda ko'rsatish
         canvas.setFont("Helvetica-Bold", 9)
-        canvas.setFillColor(colors.HexColor('#555555'))
+        canvas.setFillColor(colors.HexColor('#444444'))
         canvas.drawString(60, 45, f"№: {cert_num}")
         canvas.restoreState()
     
@@ -153,7 +156,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # Faqat Admin ko'ra oladi
     if ADMIN_ID != 0 and user_id != ADMIN_ID:
         await update.message.reply_text("⛔ Siz adminga tegishli buyruqdan foydalana olmaysiz.")
         return
@@ -218,7 +220,6 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
         cert_num = str(random.randint(100000, 999999)) if score >= 10 else "—"
         
-        # Natijani bazaga saqlash
         save_result(user_id, name, score, len(QUESTIONS), cert_num)
         
         if score >= 10:
