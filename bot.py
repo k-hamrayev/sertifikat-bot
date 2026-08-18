@@ -16,12 +16,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 # ==========================================
-# SOZLAMALAR: O'Z TELEGRAM ID-NGIZNI YOZING
+# SOZLAMALAR
 # ==========================================
-ADMIN_ID = 5070261597  # Telegram ID'ingizni shu yerga qo'ying (masalan: 123456789)
-TOKEN = "8812256632:AAEp7G5xem6lWdIMrkdewpN9FCmm9kt8T30"
+ADMIN_ID = 5070261597
+TOKEN = "8812256632:AAEp7G5xem6lWdImrkdewpn9FCmm9kt8T3O"
 
-# Database - Ma'lumotlar bazasini yaratish va sozlash
+# Database - Ma'lumotlar bazasini yaratish
 def init_db():
     conn = sqlite3.connect("quiz_bot.db")
     cursor = conn.cursor()
@@ -69,97 +69,168 @@ def run_health_check_server():
 QUESTIONS = [
     {"question": "O'zbekiston poytaxti qaysi?", "options": ["Samarqand", "Toshkent", "Buxoro"], "correct": 1},
     {"question": "Dunyodagi eng katta okean qaysi?", "options": ["Atlantika okeani", "Tinch okeani", "Hind okeani"], "correct": 1},
-    {"question": "Yer yuzidagi eng uzun daryo qaysi?", "options": ["Nil", "Amazonka", "Misisipi"], "correct": 0},
-    {"question": "Quyosh sistemasidagi eng katta sayyora qaysi?", "options": ["Zuxro", "Mars", "Yupiter"], "correct": 2},
-    {"question": "Fransiya poytaxti qaysi shahar?", "options": ["Parij", "Berlin", "Rim"], "correct": 0},
-    {"question": "Inson tanasidagi eng katta organ qaysi?", "options": ["Yurak", "Teri", "Jigar"], "correct": 1},
-    {"question": "Dunyodagi eng baland cho'qqi qaysi?", "options": ["Kengur", "Chogori", "Jomolungma (Everest)"], "correct": 2},
-    {"question": "Suvning kimyoviy formulasi qanday?", "options": ["H2O", "CO2", "NaCl"], "correct": 0},
-    {"question": "Alisher Navoiy qaysi yilda tavallud topgan?", "options": ["1441-yil", "1500-yil", "1336-yil"], "correct": 0},
-    {"question": "Yaponiya poytaxti qaysi shahar?", "options": ["Pekin", "Tokio", "Seul"], "correct": 1},
-    {"question": "O'zbekiston Respublikasining davlat bayrog'i qachon qabul qilingan?", "options": ["1991-yil 1-sentyabr", "1991-yil 18-noyabr", "1993-yil 8-dekabr"], "correct": 2},
-    {"question": "Dunyodagi eng kichik davlat qaysi?", "options": ["Monako", "Vatikan", "San-Marino"], "correct": 1},
-    {"question": "Qaysi qit'a 'Qora qit'a' deb ataladi?", "options": ["Osiyo", "Afrika", "Janubiy Amerika"], "correct": 1},
-    {"question": "Amir Temur qachon tavallud topgan?", "options": ["1336-yil", "1405-yil", "1226-yil"], "correct": 0},
-    {"question": "Dunyodagi eng chuqur ko'l qaysi?", "options": ["Baykal", "Kaspiy", "Victoriya"], "correct": 0},
-    {"question": "Matematikada pi (π) sonining taxminiy qiymati nechaga teng?", "options": ["3.14", "2.71", "1.41"], "correct": 0},
-    {"question": "Italiya poytaxti qaysi shahar?", "options": ["Madrid", "Rim", "Afina"], "correct": 1},
-    {"question": "Yorug'lik tezligi sekundiga taxminan necha kilometr?", "options": ["300 000 km/s", "150 000 km/s", "3 000 km/s"], "correct": 0},
-    {"question": "Qaysi element Mendeleev jadvalida 'O' belgisi bilan belgilangan?", "options": ["Oltin", "Kislorod", "Vodorod"], "correct": 1},
-    {"question": "Birlashgan Millatlar Tashkiloti (BMT) qachon tashkil etilgan?", "options": ["1945-yil", "1939-yil", "1950-yil"], "correct": 0}
+    {"question": "O'zbekiston Mustaqillikka erishgan yil?", "options": ["1990", "1991", "1992"], "correct": 1},
+    {"question": "Amir Temur qachon tug'ilgan?", "options": ["1336-yil 9-aprel", "1340-yil 5-may", "1330-yil 1-yanvar"], "correct": 0},
+    {"question": "O'zbekiston Respublikasining birinchi Prezidenti kim?", "options": ["Shavkat Mirziyoyev", "Islom Karimov", "Sharof Rashidov"], "correct": 1},
+    {"question": "O'zbek tili davlat tili maqomini qachon olgan?", "options": ["1989-yil 21-oktyabr", "1991-yil 1-sentyabr", "1992-yil 8-dekabr"], "correct": 0},
+    {"question": "Quyosh tizimidagi eng katta planeta qaysi?", "options": ["Mars", "Yupiter", "Saturn"], "correct": 1},
+    {"question": "O'zbekiston Konstitutsiyasi qachon qabul qilingan?", "options": ["1992-yil 8-dekabr", "1991-yil 31-avgust", "1993-yil 1-yanvar"], "correct": 0},
+    {"question": "Inson tanasida nechta suyak bor (kattalarda)?", "options": ["206 ta", "300 ta", "150 ta"], "correct": 0},
+    {"question": "Alisher Navoiy qaysi asrda yashagan?", "options": ["XV asr", "XIV asr", "XVI asr"], "correct": 0}
 ]
 
-user_scores = {}
-user_current_q = {}
-user_full_names = {}
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    context.user_data.clear()
+    await update.message.reply_text("✨ Assalomu alaykum! Viktorina botiga xush kelibsiz.\n\nSertifikat olish uchun Ism va Familiyangizni yuboring (masalan: Kamol Hamrayev):")
 
-def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: str) -> io.BytesIO:
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    
+    if text == "/stats":
+        await stats(update, context)
+        return
+
+    if "full_name" not in context.user_data:
+        context.user_data["full_name"] = text
+        keyboard = [[InlineKeyboardButton("🚀 Testni boshlash", callback_data="start_quiz")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(f"Rahmat, {text}!\n\nTestni boshlashga tayyormisiz? (10 ta savol)", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    
+    if data == "start_quiz":
+        context.user_data["score"] = 0
+        context.user_data["current_q"] = 0
+        await send_question(query, context)
+    elif data.startswith("ans_"):
+        selected_opt = int(data.split("_")[1])
+        q_idx = context.user_data["current_q"]
+        
+        if selected_opt == QUESTIONS[q_idx]["correct"]:
+            context.user_data["score"] += 1
+            
+        context.user_data["current_q"] += 1
+        
+        if context.user_data["current_q"] < len(QUESTIONS):
+            await send_question(query, context)
+        else:
+            await finish_quiz(query, context)
+
+async def send_question(query, context):
+    q_idx = context.user_data["current_q"]
+    q_data = QUESTIONS[q_idx]
+    
+    keyboard = []
+    for idx, opt in enumerate(q_data["options"]):
+        keyboard.append([InlineKeyboardButton(opt, callback_data=f"ans_{idx}")])
+        
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = f"❓ {q_idx + 1}-savol:\n{q_data['question']}"
+    
+    if query.message:
+        await query.message.edit_text(text, reply_markup=reply_markup)
+
+async def finish_quiz(query, context):
+    score = context.user_data.get("score", 0)
+    total = len(QUESTIONS)
+    full_name = context.user_data.get("full_name", "Foydalanuvchi")
+    user_id = query.from_user.id
+    
+    cert_num = f"CERT-{random.randint(100000, 999999)}"
+    save_result(user_id, full_name, score, total, cert_num)
+    
+    # ADMINGA ZUDLIK BILAN XABAR YUBORISH
+    admin_msg = (
+        f"🔔 **Yangi natija!**\n\n"
+        f"👤 **Ism:** {full_name}\n"
+        f"📊 **Natija:** {score}/{total}\n"
+        f"📜 **Sertifikat No:** {cert_num}\n"
+        f"🆔 **User ID:** `{user_id}`"
+    )
+    try:
+        await context.bot.send_message(chat_id=ADMIN_ID, text=admin_msg, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Adminga xabar yuborishda xatolik: {e}")
+
+    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikat tayyorlanmoqda...")
+    
+    pdf_buffer = generate_pdf_certificate(full_name, score, total, cert_num)
+    await context.bot.send_document(
+        chat_id=query.message.chat_id,
+        document=pdf_buffer,
+        filename=f"Sertifikat_{full_name}.pdf",
+        caption=f"Tabriklaymiz, {full_name}! Mana sizning sertifikatingiz."
+    )
+
+def generate_pdf_certificate(full_name, score, total, cert_num):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0
+        rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30
     )
     
-    # QR kod yaratish
-    qr_data = f"Sertifikat №: {cert_num}\nIsm: {user_name}\nNatija: {score}/{total}\nSana: {datetime.date.today().strftime('%d.%m.%Y')}"
-    qr_img = qrcode.make(qr_data)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CertTitle',
+        parent=styles['Heading1'],
+        fontSize=32,
+        leading=38,
+        textColor=colors.HexColor("#1A365D"),
+        alignment=1,
+        spaceAfter=15
+    )
+    name_style = ParagraphStyle(
+        'CertName',
+        parent=styles['Normal'],
+        fontSize=26,
+        leading=32,
+        textColor=colors.HexColor("#2B6CB0"),
+        alignment=1,
+        spaceAfter=15
+    )
+    text_style = ParagraphStyle(
+        'CertText',
+        parent=styles['Normal'],
+        fontSize=14,
+        leading=20,
+        textColor=colors.HexColor("#2D3748"),
+        alignment=1,
+        spaceAfter=10
+    )
+    
+    elements = []
+    elements.append(Spacer(1, 40))
+    elements.append(Paragraph("SERTIFIKAT", title_style))
+    elements.append(Paragraph("Ushbu sertifikat egasi:", text_style))
+    elements.append(Paragraph(f"<b>{full_name}</b>", name_style))
+    elements.append(Paragraph(f"Onlayn viktorinada muvaffaqiyatli qatnashib, <b>{total}</b> ta savoldan <b>{score}</b> tasiga to'g'ri javob bergani uchun topshirildi.", text_style))
+    
+    qr_img = qrcode.make(f"Sertifikat №: {cert_num}\nEgasiga: {full_name}\nNatija: {score}/{total}")
     qr_buffer = io.BytesIO()
     qr_img.save(qr_buffer, format='PNG')
     qr_buffer.seek(0)
     
-    styles = getSampleStyleSheet()
+    qr_image = Image(qr_buffer, width=80, height=80)
+    elements.append(Spacer(1, 20))
+    elements.append(qr_image)
+    elements.append(Paragraph(f"<font size=9 color='#718096'>Sertifikat raqami: {cert_num}</font>", text_style))
     
-    # Ism uchun maxsus shrift va tekislash (Chiziq ustiga to'g'ri tushishi uchun)
-    name_style = ParagraphStyle(
-        'CertName',
-        parent=styles['Normal'],
-        fontName='Times-BoldItalic',
-        fontSize=34,
-        textColor=colors.HexColor('#2A1A08'),
-        alignment=1
-    )
-
-    elements = [
-        Spacer(1, 282), # Ismni aynan chiziq ustidagi ochiq joyga tushirish uchun aniq oraliq
-        Paragraph(f"{user_name}", name_style)
-    ]
-
-    def draw_background(canvas, doc):
-        canvas.saveState()
-        template_path = "template.jpg"
-        if os.path.exists(template_path):
-            canvas.drawImage(template_path, 0, 0, width=landscape(A4)[0], height=landscape(A4)[1])
-        
-        # QR-kodni pastki chap tomondagi toza va mos bo'shliqqa chiroyli joylashtirish
-        qr_image_obj = Image(qr_buffer, width=50, height=50)
-        qr_image_obj.drawOn(canvas, 130, 85)
-        
-        # Sertifikat raqami va sanasini pastki burchakda ko'rsatish
-        canvas.setFont("Helvetica-Bold", 9)
-        canvas.setFillColor(colors.HexColor('#444444'))
-        canvas.drawString(60, 45, f"№: {cert_num}")
-        canvas.restoreState()
-    
-    doc.build(elements, onFirstPage=draw_background)
+    doc.build(elements)
     buffer.seek(0)
     return buffer
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_scores[user_id] = 0
-    user_current_q[user_id] = 0
-    await update.message.reply_text(
-        "✨ Assalomu alaykum! Viktorina botiga xush kelibsiz.\n\n"
-        "Sertifikat olish uchun Ism va Familiyangizni yuboring (masalan: Kamol Hamrayev):"
-    )
-
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if ADMIN_ID != 0 and user_id != ADMIN_ID:
-        await update.message.reply_text("⛔ Siz adminga tegishli buyruqdan foydalana olmaysiz.")
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("❌ Bu buyruq faqat admin uchun!")
         return
-        
+
     conn = sqlite3.connect("quiz_bot.db")
     cursor = conn.cursor()
     cursor.execute("SELECT full_name, score, total, cert_num, date_created FROM results ORDER BY id DESC LIMIT 20")
@@ -167,111 +238,29 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     if not rows:
-        await update.message.reply_text("📊 Hozircha hech kim test topshirmadi.")
+        await update.message.reply_text("📊 Hali hech kim test topshirmadi yoki сервер қайта ишга тушди.")
         return
 
-    text = "🏆 **G'oliblar va Ishtirokchilar ro'yxati (So'nggi 20 ta):**\n\n"
-    for idx, r in enumerate(rows, start=1):
-        status = f"🎖 Certificate №{r[3]}" if r[1] >= 10 else "❌ O'tmadi"
-        text += f"{idx}. **{r[0]}** — {r[1]}/{r[2]} ball ({status})\n📅 {r[4]}\n\n"
+    text = "📊 **G'oliblar va qatnashchilar ro'yxati:**\n\n"
+    for idx, row in enumerate(rows, 1):
+        text += f"{idx}. **{row[0]}** - {row[1]}/{row[2]} ball\n   📜 {row[3]} | 📅 {row[4]}\n\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
-    
-    user_full_names[user_id] = text
-    user_scores[user_id] = 0
-    user_current_q[user_id] = 0
-    
-    await update.message.reply_text(
-        f"Rahmat, **{text}**!\nTestimiz 20 ta savoldan iborat. Boshlash uchun pastdagi tugmani bosing:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Testni boshlash", callback_data="start_quiz")]]),
-        parse_mode="Markdown"
-    )
-
-async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    q_index = user_current_q.get(user_id, 0)
-    
-    if q_index < len(QUESTIONS):
-        q_data = QUESTIONS[q_index]
-        keyboard = [[InlineKeyboardButton(opt, callback_data=f"ans_{i}")] for i, opt in enumerate(q_data["options"])]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        text = f"❓ **Savol {q_index + 1} / {len(QUESTIONS)}**\n\n{q_data['question']}"
-        if update.callback_query:
-            try:
-                await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-            except Exception:
-                pass
-        else:
-            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-    else:
-        score = user_scores.get(user_id, 0)
-        name = user_full_names.get(user_id, "Ishtirokchi")
-        
-        if update.callback_query:
-            try:
-                await update.callback_query.message.delete()
-            except Exception:
-                pass
-                
-        cert_num = str(random.randint(100000, 999999)) if score >= 10 else "—"
-        
-        save_result(user_id, name, score, len(QUESTIONS), cert_num)
-        
-        if score >= 10:
-            pdf_buffer = generate_certificate_pdf(name, score, len(QUESTIONS), cert_num)
-            
-            await context.bot.send_document(
-                chat_id=update.effective_chat.id,
-                document=pdf_buffer,
-                filename=f"Sertifikat_{name}.pdf",
-                caption=f"🎉 Tabriklaymiz, {name}!\nSiz {len(QUESTIONS)} tadan {score} ta to'g'ri topib, sertifikatni qo'lga kiritdingiz!"
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"❌ Test yakunlandi. Natijangiz: {score} / {len(QUESTIONS)}.\n"
-                     f"Afsuski, yetarli ball to'playolmadingiz. Qaytadan urinish uchun /start ni bosing."
-            )
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    if query.data == "start_quiz":
-        user_current_q[user_id] = 0
-        user_scores[user_id] = 0
-        await send_question(update, context)
-        return
-
-    if query.data.startswith("ans_"):
-        q_index = user_current_q.get(user_id, 0)
-        if q_index < len(QUESTIONS):
-            selected = int(query.data.split("_")[1])
-            if selected == QUESTIONS[q_index]["correct"]:
-                user_scores[user_id] = user_scores.get(user_id, 0) + 1
-            
-            user_current_q[user_id] = q_index + 1
-            await send_question(update, context)
-
 def main():
     init_db()
+    
     threading.Thread(target=run_health_check_server, daemon=True).start()
-
+    
     app = ApplicationBuilder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("🤖 PDF Sertifikat boti ishga tushdi...")
-    app.run_polling(drop_pending_updates=True)
+    print("Bot ishga tushdi...")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
