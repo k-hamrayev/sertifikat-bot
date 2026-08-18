@@ -2,6 +2,7 @@ import io
 import os
 import random
 import datetime
+import sqlite3
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -9,7 +10,47 @@ import qrcode
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-# Render uchun Health Check veb-serveri
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+# ==========================================
+# SOZLAMALAR: O'Z TELEGRAM ID-NGIZNI YOZING
+# ==========================================
+ADMIN_ID = 5070261597  # Telegram ID'ingizni shu yerga qo'ying (masalan: 123456789)
+TOKEN = "8812256632:AAEp7G5xem6lWdIMrkdewpN9FCmm9kt8T30"
+
+# Database - Ma'lumotlar bazasini yaratish va sozlash
+def init_db():
+    conn = sqlite3.connect("quiz_bot.db")
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            full_name TEXT,
+            score INTEGER,
+            total INTEGER,
+            cert_num TEXT,
+            date_created TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_result(user_id, full_name, score, total, cert_num):
+    conn = sqlite3.connect("quiz_bot.db")
+    cursor = conn.cursor()
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute('''
+        INSERT INTO results (user_id, full_name, score, total, cert_num, date_created)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (user_id, full_name, score, total, cert_num, now))
+    conn.commit()
+    conn.close()
+
+# Render Health Check Server
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -25,10 +66,6 @@ def run_health_check_server():
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     httpd.serve_forever()
 
-# BOT TOKENIZNI SHU YERGA QO'YING
-TOKEN = "8812256632:AAEp7G5xem6lWdIMrkdewpN9FCmm9kt8T30"
-
-# 20 talik test savollari
 QUESTIONS = [
     {"question": "O'zbekiston poytaxti qaysi?", "options": ["Samarqand", "Toshkent", "Buxoro"], "correct": 1},
     {"question": "Dunyodagi eng katta okean qaysi?", "options": ["Atlantika okeani", "Tinch okeani", "Hind okeani"], "correct": 1},
@@ -40,7 +77,7 @@ QUESTIONS = [
     {"question": "Suvning kimyoviy formulasi qanday?", "options": ["H2O", "CO2", "NaCl"], "correct": 0},
     {"question": "Alisher Navoiy qaysi yilda tavallud topgan?", "options": ["1441-yil", "1500-yil", "1336-yil"], "correct": 0},
     {"question": "Yaponiya poytaxti qaysi shahar?", "options": ["Pekin", "Tokio", "Seul"], "correct": 1},
-    {"question": "O'zbekiston Respublikasining davlat bayrog'i qachon qabul qilingan?", "options": ["1991-yil 1-sentyabr", "1991-yil 18-noyabr", "1993-yil 8-dekabr"], "correct": 2},
+    {"question": "O'zbekiston Respublikasining davlat bayrog'i qachon qabul qilingan?", "options": ["1991-yil 1-sentyabr", "1992-yil 18-noyabr", "1993-yil 8-dekabr"], "correct": 1},
     {"question": "Dunyodagi eng kichik davlat qaysi?", "options": ["Monako", "Vatikan", "San-Marino"], "correct": 1},
     {"question": "Qaysi qit'a 'Qora qit'a' deb ataladi?", "options": ["Osiyo", "Afrika", "Janubiy Amerika"], "correct": 1},
     {"question": "Amir Temur qachon tavallud topgan?", "options": ["1336-yil", "1405-yil", "1226-yil"], "correct": 0},
@@ -56,20 +93,12 @@ user_scores = {}
 user_current_q = {}
 user_full_names = {}
 
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
 def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: str) -> io.BytesIO:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
-        rightMargin=0,
-        leftMargin=0,
-        topMargin=0,
-        bottomMargin=0
+        rightMargin=0, leftMargin=0, topMargin=0, bottomMargin=0
     )
     
     qr_data = f"Sertifikat №: {cert_num}\nIsm: {user_name}\nNatija: {score}/{total}\nSana: {datetime.date.today().strftime('%d.%m.%Y')}"
@@ -79,42 +108,34 @@ def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: s
     qr_buffer.seek(0)
     
     styles = getSampleStyleSheet()
-    
     name_style = ParagraphStyle(
         'CertName',
         parent=styles['Normal'],
         fontName='Times-BoldItalic',
-        fontSize=38,
-        textColor=colors.HexColor('#2E1C0C'),
-        alignment=1,
-        spaceAfter=2
-    )
-    
-    sub_style = ParagraphStyle(
-        'CertSub',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        textColor=colors.HexColor('#555555'),
+        fontSize=36,
+        textColor=colors.HexColor('#1A1A1A'),
         alignment=1
     )
 
     elements = [
-        Spacer(1, 280),
+        Spacer(1, 260),
         Paragraph(f"{user_name}", name_style),
-        Paragraph("PROFIL EGASI", sub_style),
-        Spacer(1, 40)
+        Spacer(1, 100)
     ]
     
-    qr_image = Image(qr_buffer, width=60, height=60)
+    qr_image = Image(qr_buffer, width=55, height=55)
     qr_image.hAlign = 'CENTER'
     elements.append(qr_image)
-    
+
     def draw_background(canvas, doc):
         canvas.saveState()
         template_path = "template.jpg"
         if os.path.exists(template_path):
             canvas.drawImage(template_path, 0, 0, width=landscape(A4)[0], height=landscape(A4)[1])
+        
+        canvas.setFont("Helvetica-Bold", 9)
+        canvas.setFillColor(colors.HexColor('#555555'))
+        canvas.drawString(60, 45, f"№: {cert_num}")
         canvas.restoreState()
     
     doc.build(elements, onFirstPage=draw_background)
@@ -126,9 +147,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_scores[user_id] = 0
     user_current_q[user_id] = 0
     await update.message.reply_text(
-        "✨ Assalomu alaykum! 20 talik test botiga xush kelibsiz.\n\n"
-        "Sertifikat olish uchun Ism va Familiyangizni yuboring (masalan: Anvar Karimov):"
+        "✨ Assalomu alaykum! Viktorina botiga xush kelibsiz.\n\n"
+        "Sertifikat olish uchun Ism va Familiyangizni yuboring (masalan: Kamol Hamrayev):"
     )
+
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    # Faqat Admin ko'ra oladi
+    if ADMIN_ID != 0 and user_id != ADMIN_ID:
+        await update.message.reply_text("⛔ Siz adminga tegishli buyruqdan foydalana olmaysiz.")
+        return
+        
+    conn = sqlite3.connect("quiz_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT full_name, score, total, cert_num, date_created FROM results ORDER BY id DESC LIMIT 20")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        await update.message.reply_text("📊 Hozircha hech kim test topshirmadi.")
+        return
+
+    text = "🏆 **G'oliblar va Ishtirokchilar ro'yxati (So'nggi 20 ta):**\n\n"
+    for idx, r in enumerate(rows, start=1):
+        status = f"🎖 Certificate №{r[3]}" if r[1] >= 10 else "❌ O'tmadi"
+        text += f"{idx}. **{r[0]}** — {r[1]}/{r[2]} ball ({status})\n📅 {r[4]}\n\n"
+
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -171,8 +216,12 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
                 
+        cert_num = str(random.randint(100000, 999999)) if score >= 10 else "—"
+        
+        # Natijani bazaga saqlash
+        save_result(user_id, name, score, len(QUESTIONS), cert_num)
+        
         if score >= 10:
-            cert_num = str(random.randint(100000, 999999))
             pdf_buffer = generate_certificate_pdf(name, score, len(QUESTIONS), cert_num)
             
             await context.bot.send_document(
@@ -210,11 +259,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_question(update, context)
 
 def main():
+    init_db()
     threading.Thread(target=run_health_check_server, daemon=True).start()
 
     app = ApplicationBuilder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(button_handler))
     
