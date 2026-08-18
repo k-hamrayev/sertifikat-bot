@@ -9,11 +9,6 @@ import qrcode
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
 # Render uchun Health Check veb-serveri
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -21,13 +16,17 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"Bot ishlayapti!")
 
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
 def run_health_check_server():
     server_address = ('', 10000)
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     httpd.serve_forever()
 
-# Bot sozlamalari
-TOKEN = "8812256632:AAHfNhZT_-tNGv16HzhGCvrodYIHTVJhrmM"
+# BOT TOKENIZNI SHU YERGA QO'YING
+TOKEN = "8812256632:AAEp7G5xem6lWdIMrkdewpN9FCmm9kt8T30"
 
 # 20 talik test savollari
 QUESTIONS = [
@@ -57,7 +56,11 @@ user_scores = {}
 user_current_q = {}
 user_full_names = {}
 
-# PDF sertifikat yaratish funksiyasi
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
 def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: str) -> io.BytesIO:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -96,13 +99,12 @@ def generate_certificate_pdf(user_name: str, score: int, total: int, cert_num: s
         alignment=1
     )
 
-    elements = []
-    
-    elements.append(Spacer(1, 280)) 
-    elements.append(Paragraph(f"{user_name}", name_style))
-    elements.append(Paragraph("PROFIL EGASI", sub_style))
-    
-    elements.append(Spacer(1, 40))
+    elements = [
+        Spacer(1, 280),
+        Paragraph(f"{user_name}", name_style),
+        Paragraph("PROFIL EGASI", sub_style),
+        Spacer(1, 40)
+    ]
     
     qr_image = Image(qr_buffer, width=60, height=60)
     qr_image.hAlign = 'CENTER'
@@ -138,29 +140,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         f"Rahmat, **{text}**!\nTestimiz 20 ta savoldan iborat. Boshlash uchun pastdagi tugmani bosing:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Testni boshlash", callback_data="start_quiz")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Testni boshlash", callback_data="start_quiz")]]),
+        parse_mode="Markdown"
     )
 
 async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    q_index = user_current_q[user_id]
+    q_index = user_current_q.get(user_id, 0)
     
     if q_index < len(QUESTIONS):
         q_data = QUESTIONS[q_index]
-        keyboard = [[InlineKeyboardButton(opt, callback_data=f"{i}")] for i, opt in enumerate(q_data["options"])]
+        keyboard = [[InlineKeyboardButton(opt, callback_data=f"ans_{i}")] for i, opt in enumerate(q_data["options"])]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         text = f"❓ **Savol {q_index + 1} / {len(QUESTIONS)}**\n\n{q_data['question']}"
         if update.callback_query:
-            await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+            try:
+                await update.callback_query.message.edit_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+            except Exception:
+                pass
         else:
             await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        score = user_scores[user_id]
+        score = user_scores.get(user_id, 0)
+        name = user_full_names.get(user_id, "Ishtirokchi")
+        
+        if update.callback_query:
+            try:
+                await update.callback_query.message.delete()
+            except Exception:
+                pass
+                
         if score >= 10:
-            name = user_full_names.get(user_id, "Ishtirokchi")
-            await update.callback_query.message.delete()
-            
             cert_num = str(random.randint(100000, 999999))
             pdf_buffer = generate_certificate_pdf(name, score, len(QUESTIONS), cert_num)
             
@@ -171,9 +182,10 @@ async def send_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=f"🎉 Tabriklaymiz, {name}!\nSiz {len(QUESTIONS)} tadan {score} ta to'g'ri topib, sertifikatni qo'lga kiritdingiz!"
             )
         else:
-            await update.callback_query.message.edit_text(
-                f"❌ Test yakunlandi. Natijangiz: {score} / {len(QUESTIONS)}.\n"
-                f"Afsuski, yetarli ball to'playolmadingiz. Qaytadan urinish uchun /start ni bosing."
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"❌ Test yakunlandi. Natijangiz: {score} / {len(QUESTIONS)}.\n"
+                     f"Afsuski, yetarli ball to'playolmadingiz. Qaytadan urinish uchun /start ni bosing."
             )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -182,17 +194,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
     if query.data == "start_quiz":
+        user_current_q[user_id] = 0
+        user_scores[user_id] = 0
         await send_question(update, context)
         return
 
-    q_index = user_current_q.get(user_id, 0)
-    if q_index < len(QUESTIONS):
-        selected = int(query.data)
-        if selected == QUESTIONS[q_index]["correct"]:
-            user_scores[user_id] += 1
-        
-        user_current_q[user_id] += 1
-        await send_question(update, context)
+    if query.data.startswith("ans_"):
+        q_index = user_current_q.get(user_id, 0)
+        if q_index < len(QUESTIONS):
+            selected = int(query.data.split("_")[1])
+            if selected == QUESTIONS[q_index]["correct"]:
+                user_scores[user_id] = user_scores.get(user_id, 0) + 1
+            
+            user_current_q[user_id] = q_index + 1
+            await send_question(update, context)
 
 def main():
     threading.Thread(target=run_health_check_server, daemon=True).start()
@@ -204,7 +219,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     
     print("🤖 PDF Sertifikat boti ishga tushdi...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
