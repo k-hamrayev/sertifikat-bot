@@ -7,13 +7,9 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import qrcode
+from PIL import Image, ImageDraw, ImageFont
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 # ==========================================
 # SOZLAMALAR
@@ -66,7 +62,7 @@ def run_health_check_server():
     httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
     httpd.serve_forever()
 
-# 20 TA YANGI SAVOLLAR
+# 20 TA SAVOL
 QUESTIONS = [
     {"question": "O'zbekiston Respublikasi poytaxti qaysi shahar?", "options": ["Samarqand", "Toshkent", "Buxoro"], "correct": 1},
     {"question": "Dunyodagi eng katta okean qaysi?", "options": ["Atlantika okeani", "Tinch okeani", "Hind okeani"], "correct": 1},
@@ -176,74 +172,64 @@ async def finish_quiz(query, context):
     except Exception as e:
         print(f"Adminga xabar yuborishda xatolik: {e}")
 
-    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikat tayyorlanmoqda...")
+    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikatingiz тайёрланмоқда...")
     
-    pdf_buffer = generate_pdf_certificate(full_name, score, total, cert_num)
-    await context.bot.send_document(
-        chat_id=query.message.chat_id,
-        document=pdf_buffer,
-        filename=f"Sertifikat_{full_name}.pdf",
-        caption=f"Tabriklaymiz, {full_name}! Mana sizning sertifikatingiz."
-    )
+    # Rasm shablonidan sertifikat tayyorlash
+    cert_bytes = generate_image_certificate(full_name, score, total, cert_num)
+    
+    if cert_bytes:
+        await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=cert_bytes,
+            caption=f"🏆 Tabriklaymiz, {full_name}!\nSizнинг сертификатингиз тайёр бўлди."
+        )
+    else:
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"Siz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz."
+        )
 
-def generate_pdf_certificate(full_name, score, total, cert_num):
+# RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
+def generate_image_certificate(full_name, score, total, cert_num):
+    template_path = "template.png"
+    if not os.path.exists(template_path):
+        template_path = "template.jpg"
+        if not os.path.exists(template_path):
+            return None
+
+    img = Image.open(template_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    
+    width, height = img.size
+    
+    try:
+        font_name = ImageFont.truetype("arial.ttf", int(height * 0.05))
+        font_sub = ImageFont.truetype("arial.ttf", int(height * 0.03))
+    except:
+        font_name = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+
+    # Ismni rasm markaziga yozish
+    text_position = (width / 2, height * 0.45)
+    draw.text(text_position, full_name, fill=(26, 54, 93), font=font_name, anchor="mm")
+    
+    # Natijani yozish
+    score_text = f"Natija: {score} / {total} ball ({cert_num})"
+    draw.text((width / 2, height * 0.55), score_text, fill=(43, 108, 176), font=font_sub, anchor="mm")
+
+    # QR kod yaratish va o'ng pastga qo'yish
+    qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name}\nNatija: {score}/{total}")
+    qr_size = int(height * 0.18)
+    qr = qr.resize((qr_size, qr_size))
+    
+    img.paste(qr, (int(width - qr_size - 50), int(height - qr_size - 50)))
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(A4),
-        rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30
-    )
-    
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CertTitle',
-        parent=styles['Heading1'],
-        fontSize=32,
-        leading=38,
-        textColor=colors.HexColor("#1A365D"),
-        alignment=1,
-        spaceAfter=15
-    )
-    name_style = ParagraphStyle(
-        'CertName',
-        parent=styles['Normal'],
-        fontSize=26,
-        leading=32,
-        textColor=colors.HexColor("#2B6CB0"),
-        alignment=1,
-        spaceAfter=15
-    )
-    text_style = ParagraphStyle(
-        'CertText',
-        parent=styles['Normal'],
-        fontSize=14,
-        leading=20,
-        textColor=colors.HexColor("#2D3748"),
-        alignment=1,
-        spaceAfter=10
-    )
-    
-    elements = []
-    elements.append(Spacer(1, 40))
-    elements.append(Paragraph("SERTIFIKAT", title_style))
-    elements.append(Paragraph("Ushbu sertifikat egasi:", text_style))
-    elements.append(Paragraph(f"<b>{full_name}</b>", name_style))
-    elements.append(Paragraph(f"Onlayn viktorinada muvaffaqiyatli qatnashib, <b>{total}</b> ta savoldan <b>{score}</b> tasiga to'g'ri javob bergani uchun topshirildi.", text_style))
-    
-    qr_img = qrcode.make(f"Sertifikat №: {cert_num}\nEgasiga: {full_name}\nNatija: {score}/{total}")
-    qr_buffer = io.BytesIO()
-    qr_img.save(qr_buffer, format='PNG')
-    qr_buffer.seek(0)
-    
-    qr_image = Image(qr_buffer, width=80, height=80)
-    elements.append(Spacer(1, 20))
-    elements.append(qr_image)
-    elements.append(Paragraph(f"<font size=9 color='#718096'>Sertifikat raqami: {cert_num}</font>", text_style))
-    
-    doc.build(elements)
+    img.save(buffer, format="JPEG", quality=95)
     buffer.seek(0)
     return buffer
 
+# G'OLIBLAR RO'YXATI (BAL LOGIKASI BILAN)
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
@@ -252,7 +238,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn = sqlite3.connect("quiz_bot.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT full_name, score, total, cert_num, date_created FROM results ORDER BY id DESC LIMIT 20")
+    # Eng yuqori ball to'plagan haqiqiy g'oliblarni saralash (ORDER BY score DESC)
+    cursor.execute("SELECT full_name, score, total, cert_num, date_created FROM results ORDER BY score DESC, id ASC LIMIT 20")
     rows = cursor.fetchall()
     conn.close()
 
@@ -260,9 +247,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📊 Hali hech kim test topshirmadi.")
         return
 
-    text = "📊 **G'oliblar va qatnashchilar ro'yxati:**\n\n"
+    text = "🏆 **ENG YUQORI NATIJA KO'RSATGAN G'OLIBLAR RO'YXATI:**\n\n"
     for idx, row in enumerate(rows, 1):
-        text += f"{idx}. **{row[0]}** - {row[1]}/{row[2]} ball\n   📜 {row[3]} | 📅 {row[4]}\n\n"
+        medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "🎖"
+        text += f"{medal} {idx}. **{row[0]}** — **{row[1]}/{row[2]} ball**\n   📜 {row[3]} | 📅 {row[4]}\n\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
