@@ -190,6 +190,7 @@ async def finish_quiz(query, context):
         )
 
 # RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
+# RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 def generate_image_certificate(full_name, score, total, cert_num):
     template_path = "template.png"
     if not os.path.exists(template_path):
@@ -212,8 +213,9 @@ def generate_image_certificate(full_name, score, total, cert_num):
         except Exception as e:
             print(f"Font yuklashda xatolik: {e}")
 
-    name_font_size = int(height * 0.055)
-    info_font_size = int(height * 0.025)
+    # Font o'lchamlari
+    name_font_size = int(height * 0.048)
+    info_font_size = int(height * 0.024)
 
     try:
         font_name = ImageFont.truetype(font_path, name_font_size)
@@ -222,16 +224,16 @@ def generate_image_certificate(full_name, score, total, cert_num):
         font_name = ImageFont.load_default()
         font_sub = ImageFont.load_default()
 
-    # 1. Ism-familiyani KATTA va ANIQ fontda markazga yozish
-    name_y = height * 0.47
+    # 1. Ism-familiya (Sariq chiziqning aynan ustiga joylashadi)
+    name_y = height * 0.615
     draw.text((width / 2, name_y), full_name_upper, fill=(20, 20, 20), font=font_name, anchor="mm")
     
-    # 2. Natija va sertifikat raqamini yozish
+    # 2. Natija va sertifikat raqami (Sariq chiziqdan sal teparoqda)
     info_text = f"Natija: {score}/{total} ball | № {cert_num}"
-    info_y = height * 0.53
+    info_y = height * 0.570
     draw.text((width / 2, info_y), info_text, fill=(60, 60, 60), font=font_sub, anchor="mm")
 
-    # 3. QR-kodni o'ng pastga qo'yish
+    # 3. QR-kod
     qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name_upper}\nNatija: {score}/{total}")
     qr_size = int(height * 0.16)
     qr = qr.resize((qr_size, qr_size))
@@ -244,7 +246,6 @@ def generate_image_certificate(full_name, score, total, cert_num):
     img.save(buffer, format="JPEG", quality=95)
     buffer.seek(0)
     return buffer
-
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
