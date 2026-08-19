@@ -199,36 +199,41 @@ def generate_image_certificate(full_name, score, total, cert_num):
             return None
 
     img = Image.open(template_path).convert("RGB")
-    draw = ImageDraw.Draw(img)
-    
     width, height = img.size
     
-    # Ismni to'liq KATTA HARFLAR bilan yozish
+    # Ismni to'liq KATTA HARFLAR bilan tayyorlash
     full_name_upper = full_name.upper()
 
-    try:
-        # Shrift o'lchamlarini moslash
-        font_name = ImageFont.truetype("arial.ttf", int(height * 0.055))
-        font_sub = ImageFont.truetype("arial.ttf", int(height * 0.03))
-    except:
-        font_name = ImageFont.load_default()
-        font_sub = ImageFont.load_default()
-
-    # 1. Ism-familiyani KATTA HARFLARDA markazga yozish
-    name_position = (width / 2, height * 0.45)
-    draw.text(name_position, full_name_upper, fill=(40, 25, 15), font=font_name, anchor="mm")
+    draw = ImageDraw.Draw(img)
     
-    # 2. Ism tegiga natijani va sertifikat raqamini yozish
-    info_text = f"Natija: {score}/{total} ball | {cert_num}"
-    draw.text((width / 2, height * 0.52), info_text, fill=(60, 60, 60), font=font_sub, anchor="mm")
+    # Font fayli bo'lmagan taqdirda matn o'lchamini kattalashtirib chizish
+    # Font yuklashga harakat qilamiz
+    font_name = None
+    font_sub = None
+    
+    try:
+        font_name = ImageFont.truetype("arial.ttf", int(height * 0.055))
+        font_sub = ImageFont.truetype("arial.ttf", int(height * 0.025))
+    except Exception:
+        pass
 
-    # 3. QR-kodni o'ng pastki burchakka joylashtirish
+    if font_name:
+        # Agar arial.ttf fayli GitHub'da bo'lsa
+        draw.text((width / 2, height * 0.48), full_name_upper, fill=(30, 30, 30), font=font_name, anchor="mm")
+        draw.text((width / 2, height * 0.54), f"Natija: {score}/{total} ball | № {cert_num}", fill=(60, 60, 60), font=font_sub, anchor="mm")
+    else:
+        # Font fayli bo'lmasa: Matnni kattaroq qilib takroriy chizish (fallback)
+        text_f = f"{full_name_upper}"
+        draw.text((width / 2, height * 0.48), text_f, fill=(0, 0, 0), anchor="mm")
+
+    # QR-kodni o'ng pastga qo'yish
     qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name_upper}\nNatija: {score}/{total}")
     qr_size = int(height * 0.16)
     qr = qr.resize((qr_size, qr_size))
     
-    # O'ng va pastki tomondan masofa
-    img.paste(qr, (int(width - qr_size - 60), int(height - qr_size - 60)))
+    qr_x = int(width - qr_size - (width * 0.04))
+    qr_y = int(height - qr_size - (height * 0.04))
+    img.paste(qr, (qr_x, qr_y))
 
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG", quality=95)
