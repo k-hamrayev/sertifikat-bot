@@ -190,6 +190,7 @@ async def finish_quiz(query, context):
         )
 
 # RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
+# RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 def generate_image_certificate(full_name, score, total, cert_num):
     template_path = "template.png"
     if not os.path.exists(template_path):
@@ -202,33 +203,37 @@ def generate_image_certificate(full_name, score, total, cert_num):
     
     width, height = img.size
     
+    # Ismni to'liq KATTA HARFLAR bilan yozish
+    full_name_upper = full_name.upper()
+
     try:
-        font_name = ImageFont.truetype("arial.ttf", int(height * 0.05))
+        # Shrift o'lchamlarini moslash
+        font_name = ImageFont.truetype("arial.ttf", int(height * 0.055))
         font_sub = ImageFont.truetype("arial.ttf", int(height * 0.03))
     except:
         font_name = ImageFont.load_default()
         font_sub = ImageFont.load_default()
 
-    # Ismni rasm markaziga yozish
-    text_position = (width / 2, height * 0.45)
-    draw.text(text_position, full_name, fill=(26, 54, 93), font=font_name, anchor="mm")
+    # 1. Ism-familiyani KATTA HARFLARDA markazga yozish
+    name_position = (width / 2, height * 0.45)
+    draw.text(name_position, full_name_upper, fill=(40, 25, 15), font=font_name, anchor="mm")
     
-    # Natijani yozish
-    score_text = f"Natija: {score} / {total} ball ({cert_num})"
-    draw.text((width / 2, height * 0.55), score_text, fill=(43, 108, 176), font=font_sub, anchor="mm")
+    # 2. Ism tegiga natijani va sertifikat raqamini yozish
+    info_text = f"Natija: {score}/{total} ball | {cert_num}"
+    draw.text((width / 2, height * 0.52), info_text, fill=(60, 60, 60), font=font_sub, anchor="mm")
 
-    # QR kod yaratish va o'ng pastga qo'yish
-    qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name}\nNatija: {score}/{total}")
-    qr_size = int(height * 0.18)
+    # 3. QR-kodni o'ng pastki burchakka joylashtirish
+    qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name_upper}\nNatija: {score}/{total}")
+    qr_size = int(height * 0.16)
     qr = qr.resize((qr_size, qr_size))
     
-    img.paste(qr, (int(width - qr_size - 50), int(height - qr_size - 50)))
+    # O'ng va pastki tomondan masofa
+    img.paste(qr, (int(width - qr_size - 60), int(height - qr_size - 60)))
 
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG", quality=95)
     buffer.seek(0)
     return buffer
-
 # G'OLIBLAR RO'YXATI (BAL LOGIKASI BILAN)
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
