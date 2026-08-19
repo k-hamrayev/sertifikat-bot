@@ -10,6 +10,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import Forbidden, TelegramError
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 # ==========================================
@@ -89,7 +90,12 @@ QUESTIONS = [
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text("✨ Assalomu alaykum! Onlayn viktorina botiga xush kelibsiz.\n\nSertifikat olish uchun Ism va Familiyangizni yuboring (masalan: KAMOL HAMRAYEV):")
+    try:
+        await update.message.reply_text("✨ Assalomu alaykum! Onlayn viktorina botiga xush kelibsiz.\n\nSertifikat olish uchun Ism va Familiyangizni yuboring (masalan: KAMOL HAMRAYEV):")
+    except Forbidden:
+        print("Foydalanuvchi botni bloklagan.")
+    except TelegramError as e:
+        print(f"Telegram xatoligi: {e}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -102,16 +108,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["full_name"] = text
         keyboard = [[InlineKeyboardButton("🚀 Testni boshlash", callback_data="start_quiz")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"Rahmat, {text}!\n\nTestni boshlashga tayyormisiz? (20 ta savol)", reply_markup=reply_markup)
+        try:
+            await update.message.reply_text(f"Rahmat, {text}!\n\nTestni boshlashga tayyormisiz? (20 ta savol)", reply_markup=reply_markup)
+        except Forbidden:
+            print("Foydalanuvchi botni bloklagan.")
+        except TelegramError as e:
+            print(f"Telegram xatoligi: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except Exception:
+        pass
     
     data = query.data
     
     if "full_name" not in context.user_data:
-        await query.message.edit_text("⚠️ Xatolik yuz berdi. Iltimos, qaytadan /start bosib ism-familiyangizni kiriting.")
+        try:
+            await query.message.edit_text("⚠️ Xatolik yuz berdi. Iltimos, qaytadan /start bosib ism-familiyangizni kiriting.")
+        except Exception:
+            pass
         return
 
     if data == "start_quiz":
@@ -149,7 +166,12 @@ async def send_question(query, context):
     text = f"❓ {q_idx + 1}/{len(QUESTIONS)}-savol:\n{q_data['question']}"
     
     if query.message:
-        await query.message.edit_text(text, reply_markup=reply_markup)
+        try:
+            await query.message.edit_text(text, reply_markup=reply_markup)
+        except Forbidden:
+            print("Foydalanuvchi botni bloklagan.")
+        except TelegramError as e:
+            print(f"Savol yuborishda xatolik: {e}")
 
 async def finish_quiz(query, context):
     score = context.user_data.get("score", 0)
@@ -173,23 +195,27 @@ async def finish_quiz(query, context):
     except Exception as e:
         print(f"Adminga xabar yuborishda xatolik: {e}")
 
-    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikatingiz tayyorlanmoqda...")
-    
-    cert_bytes = generate_image_certificate(full_name, score, total, cert_num)
-    
-    if cert_bytes:
-        await context.bot.send_photo(
-            chat_id=query.message.chat_id,
-            photo=cert_bytes,
-            caption=f"🏆 Tabriklaymiz, {full_name}!\nSizning sertifikatingiz tayyor bo'ldi."
-        )
-    else:
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"Siz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz."
-        )
+    try:
+        await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikatingiz tayyorlanmoqda...")
+        
+        cert_bytes = generate_image_certificate(full_name, score, total, cert_num)
+        
+        if cert_bytes:
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=cert_bytes,
+                caption=f"🏆 Tabriklaymiz, {full_name}!\nSizning sertifikatingiz tayyor bo'ldi."
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Siz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz."
+            )
+    except Forbidden:
+        print(f"User {user_id} botni bloklagani uchun хабар юборилмади.")
+    except TelegramError as e:
+        print(f"Sertifikat yuborishda Telegram xatosi: {e}")
 
-# RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 # RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 def generate_image_certificate(full_name, score, total, cert_num):
     template_path = "template.png"
@@ -246,10 +272,14 @@ def generate_image_certificate(full_name, score, total, cert_num):
     img.save(buffer, format="JPEG", quality=95)
     buffer.seek(0)
     return buffer
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("❌ Bu buyruq faqat admin uchun!")
+        try:
+            await update.message.reply_text("❌ Bu buyruq faqat admin uchun!")
+        except Exception:
+            pass
         return
 
     conn = sqlite3.connect("quiz_bot.db")
@@ -259,7 +289,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     if not rows:
-        await update.message.reply_text("📊 Hali hech kim test topshirmadi.")
+        try:
+            await update.message.reply_text("📊 Hali hech kim test topshirmadi.")
+        except Exception:
+            pass
         return
 
     text = "🏆 **ENG YUQORI NATIJA KO'RSATGAN G'OLIBLAR RO'YXATI:**\n\n"
@@ -267,7 +300,12 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         medal = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else "🎖"
         text += f"{medal} {idx}. **{row[0]}** — **{row[1]}/{row[2]} ball**\n   📜 {row[3]} | 📅 {row[4]}\n\n"
 
-    await update.message.reply_text(text, parse_mode="Markdown")
+    try:
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Forbidden:
+        print("Admin botni bloklagan.")
+    except TelegramError as e:
+        print(f"Stats yuborishda xatolik: {e}")
 
 def main():
     init_db()
