@@ -4,6 +4,7 @@ import random
 import datetime
 import sqlite3
 import threading
+import urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import qrcode
@@ -88,7 +89,7 @@ QUESTIONS = [
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    await update.message.reply_text("✨ Assalomu alaykum! Onlayn viktorina botiga xush kelibsiz.\n\nSertifikat olish uchun Ism va Familiyangizni yuboring (masalan: Kamol Hamrayev):")
+    await update.message.reply_text("✨ Assalomu alaykum! Onlayn viktorina botiga xush kelibsiz.\n\nSertifikat olish uchun Ism va Familiyangizni yuboring (masalan: KAMOL HAMRAYEV):")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -172,16 +173,15 @@ async def finish_quiz(query, context):
     except Exception as e:
         print(f"Adminga xabar yuborishda xatolik: {e}")
 
-    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikatingiz тайёрланмоқда...")
+    await query.message.edit_text(f"🏁 Test yakunlandi!\nSiz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz.\n\nSertifikatingiz tayyorlanmoqda...")
     
-    # Rasm shablonidan sertifikat tayyorlash
     cert_bytes = generate_image_certificate(full_name, score, total, cert_num)
     
     if cert_bytes:
         await context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=cert_bytes,
-            caption=f"🏆 Tabriklaymiz, {full_name}!\nSizнинг сертификатингиз тайёр бўлди."
+            caption=f"🏆 Tabriklaymiz, {full_name}!\nSizning sertifikatingiz tayyor bo'ldi."
         )
     else:
         await context.bot.send_message(
@@ -189,7 +189,6 @@ async def finish_quiz(query, context):
             text=f"Siz {total} ta savoldan {score} tasiga to'g'ri javob berdingiz."
         )
 
-# RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 # RASM SHABLONIGA MATN VA QR-KOD JOYLASHTIRISH
 def generate_image_certificate(full_name, score, total, cert_num):
     template_path = "template.png"
@@ -199,34 +198,40 @@ def generate_image_certificate(full_name, score, total, cert_num):
             return None
 
     img = Image.open(template_path).convert("RGB")
-    width, height = img.size
-    
-    # Ismni to'liq KATTA HARFLAR bilan tayyorlash
-    full_name_upper = full_name.upper()
-
     draw = ImageDraw.Draw(img)
     
-    # Font fayli bo'lmagan taqdirda matn o'lchamini kattalashtirib chizish
-    # Font yuklashga harakat qilamiz
-    font_name = None
-    font_sub = None
-    
+    width, height = img.size
+    full_name_upper = full_name.upper()
+
+    # Font faylini avtomatik yuklab olish
+    font_path = "DejaVuSans-Bold.ttf"
+    if not os.path.exists(font_path):
+        try:
+            url = "https://github.com/dejavu-fonts-official/dejavu-fonts/raw/master/ttf/DejaVuSans-Bold.ttf"
+            urllib.request.urlretrieve(url, font_path)
+        except Exception as e:
+            print(f"Font yuklashda xatolik: {e}")
+
+    name_font_size = int(height * 0.055)
+    info_font_size = int(height * 0.025)
+
     try:
-        font_name = ImageFont.truetype("arial.ttf", int(height * 0.055))
-        font_sub = ImageFont.truetype("arial.ttf", int(height * 0.025))
+        font_name = ImageFont.truetype(font_path, name_font_size)
+        font_sub = ImageFont.truetype(font_path, info_font_size)
     except Exception:
-        pass
+        font_name = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
 
-    if font_name:
-        # Agar arial.ttf fayli GitHub'da bo'lsa
-        draw.text((width / 2, height * 0.48), full_name_upper, fill=(30, 30, 30), font=font_name, anchor="mm")
-        draw.text((width / 2, height * 0.54), f"Natija: {score}/{total} ball | № {cert_num}", fill=(60, 60, 60), font=font_sub, anchor="mm")
-    else:
-        # Font fayli bo'lmasa: Matnni kattaroq qilib takroriy chizish (fallback)
-        text_f = f"{full_name_upper}"
-        draw.text((width / 2, height * 0.48), text_f, fill=(0, 0, 0), anchor="mm")
+    # 1. Ism-familiyani KATTA va ANIQ fontda markazga yozish
+    name_y = height * 0.47
+    draw.text((width / 2, name_y), full_name_upper, fill=(20, 20, 20), font=font_name, anchor="mm")
+    
+    # 2. Natija va sertifikat raqamini yozish
+    info_text = f"Natija: {score}/{total} ball | № {cert_num}"
+    info_y = height * 0.53
+    draw.text((width / 2, info_y), info_text, fill=(60, 60, 60), font=font_sub, anchor="mm")
 
-    # QR-kodni o'ng pastga qo'yish
+    # 3. QR-kodni o'ng pastga qo'yish
     qr = qrcode.make(f"Sertifikat: {cert_num}\nEgasiga: {full_name_upper}\nNatija: {score}/{total}")
     qr_size = int(height * 0.16)
     qr = qr.resize((qr_size, qr_size))
@@ -239,7 +244,7 @@ def generate_image_certificate(full_name, score, total, cert_num):
     img.save(buffer, format="JPEG", quality=95)
     buffer.seek(0)
     return buffer
-# G'OLIBLAR RO'YXATI (BAL LOGIKASI BILAN)
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
@@ -248,7 +253,6 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn = sqlite3.connect("quiz_bot.db")
     cursor = conn.cursor()
-    # Eng yuqori ball to'plagan haqiqiy g'oliblarni saralash (ORDER BY score DESC)
     cursor.execute("SELECT full_name, score, total, cert_num, date_created FROM results ORDER BY score DESC, id ASC LIMIT 20")
     rows = cursor.fetchall()
     conn.close()
